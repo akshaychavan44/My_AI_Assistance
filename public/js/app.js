@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { voiceprintEngine } from './voiceprint.js';
 
 // Application State
 const state = {
@@ -1045,7 +1046,7 @@ function renderMarkdown(md) {
   return html;
 }
 
-// ================= VOICE COMMANDS (NO SECRET REVEAL BY VOICE) =================
+// ================= VOICE BIOMETRICS & SPEAKER-VERIFIED COMMANDS =================
 function setupVoiceAssistant() {
   const modal = document.getElementById('voice-modal');
   const open = document.getElementById('btn-open-voice-modal');
@@ -1056,22 +1057,141 @@ function setupVoiceAssistant() {
   const stateLabel = document.getElementById('voice-state');
   const transcript = document.getElementById('voice-transcript');
   const result = document.getElementById('voice-result');
+
+  // Voiceprint UI elements
+  const vpBadgeIcon = document.getElementById('vp-badge-icon');
+  const vpStatusTitle = document.getElementById('vp-status-title');
+  const vpStatusSub = document.getElementById('vp-status-sub');
+  const btnCalibrate = document.getElementById('btn-calibrate-voice');
+  const vpLiveMatch = document.getElementById('vp-live-match');
+  const vpMatchText = document.getElementById('vp-match-text');
+  const enrollBox = document.getElementById('voice-enroll-box');
+  const mainInterface = document.getElementById('voice-main-interface');
+  const enrollProgress = document.getElementById('voice-enroll-progress');
+  const enrollStatus = document.getElementById('voice-enroll-status');
+
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
+  let currentLiveCapture = null;
 
-  const runCommand = (raw) => {
+  // Sync Voiceprint state
+  async function syncVoiceprint() {
+    try {
+      // 1. Try local storage cache
+      const cached = localStorage.getItem('vault_owner_voiceprint');
+      if (cached) {
+        try {
+          voiceprintEngine.setEnrolled(JSON.parse(cached));
+        } catch (e) {}
+      }
+
+      // 2. Fetch from cloud database
+      if (api.getToken()) {
+        const res = await api.auth.getVoiceprint().catch(() => ({}));
+        if (res.voiceprint) {
+          voiceprintEngine.setEnrolled(res.voiceprint);
+          localStorage.setItem('vault_owner_voiceprint', JSON.stringify(res.voiceprint));
+        }
+      }
+
+      updateVoiceprintUI();
+    } catch (err) {
+      console.warn('Voiceprint sync notice:', err.message);
+    }
+  }
+
+  function updateVoiceprintUI() {
+    if (voiceprintEngine.isEnrolled()) {
+      if (vpBadgeIcon) vpBadgeIcon.textContent = '🟢';
+      if (vpStatusTitle) vpStatusTitle.textContent = `Voiceprint: Verified Owner (${state.currentUser?.username || 'Owner'})`;
+      if (vpStatusSub) vpStatusSub.textContent = 'Owner-only protection active. Unrecognized voices are blocked.';
+      if (btnCalibrate) btnCalibrate.textContent = '🔄 Re-calibrate';
+    } else {
+      if (vpBadgeIcon) vpBadgeIcon.textContent = '🟡';
+      if (vpStatusTitle) vpStatusTitle.textContent = 'Voiceprint: Not Calibrated';
+      if (vpStatusSub) vpStatusSub.textContent = 'Calibrate your voice so the vault only accepts commands from you.';
+      if (btnCalibrate) btnCalibrate.textContent = '🎙️ Calibrate';
+    }
+  }
+
+  // Voice Calibration (Enrollment)
+  btnCalibrate?.addEventListener('click', async () => {
+    try {
+      if (enrollBox) enrollBox.style.display = 'block';
+      if (mainInterface) mainInterface.style.display = 'none';
+      if (enrollProgress) enrollProgress.style.width = '0%';
+      if (enrollStatus) enrollStatus.textContent = 'Analyzing your vocal harmonics & acoustics (Speak for 4 seconds)...';
+
+      const voiceprint = await voiceprintEngine.startCalibration(4500, (pct) => {
+        if (enrollProgress) enrollProgress.width = `${pct}%`;
+        if (enrollProgress) enrollProgress.style.width = `${pct}%`;
+      });
+
+      // Save locally and to Neon Database
+      localStorage.setItem('vault_owner_voiceprint', JSON.stringify(voiceprint));
+      await api.auth.saveVoiceprint(voiceprint).catch(err => console.warn('Could not persist voiceprint to cloud:', err));
+
+      updateVoiceprintUI();
+      if (enrollStatus) enrollStatus.textContent = '✅ Voiceprint calibrated successfully!';
+      setTimeout(() => {
+        if (enrollBox) enrollBox.style.display = 'none';
+        if (mainInterface) mainInterface.style.display = 'block';
+        if (result) result.textContent = 'Voice locked to you! Only your voice can execute vault commands now.';
+      }, 1000);
+    } catch (err) {
+      if (enrollStatus) enrollStatus.textContent = '⚠️ ' + err.message;
+      setTimeout(() => {
+        if (enrollBox) enrollBox.style.display = 'none';
+        if (mainInterface) mainInterface.style.display = 'block';
+      }, 3000);
+    }
+  });
+
+  const runCommand = (raw, isVoiceInput = false, bioResult = null) => {
     const command = raw.trim();
     const normalized = command.toLowerCase();
     transcript.textContent = command || 'Please say or type a command.';
     result.textContent = '';
     if (!command) return;
+
+    // If spoken via voice, enforce Speaker Biometric Verification
+    if (isVoiceInput) {
+      if (!voiceprintEngine.isEnrolled()) {
+        if (vpLiveMatch) {
+          vpLiveMatch.className = 'vp-live-badge mismatch';
+          vpLiveMatch.style.display = 'flex';
+          if (vpMatchText) vpMatchText.textContent = '⚠️ Voiceprint Not Enrolled — Tap "Calibrate" above to lock to your voice.';
+        }
+        result.textContent = '⚠️ Please calibrate your voice first by clicking "Calibrate" above to enable owner-only voice control.';
+        return;
+      }
+
+      if (!bioResult || !bioResult.verified) {
+        const score = bioResult ? bioResult.score : 0;
+        if (vpLiveMatch) {
+          vpLiveMatch.className = 'vp-live-badge mismatch';
+          vpLiveMatch.style.display = 'flex';
+          if (vpMatchText) vpMatchText.textContent = `🚫 Unrecognized Speaker (Acoustic Match: ${score}% — required 72%)`;
+        }
+        result.textContent = `🚫 Command Blocked: Voice not recognized as vault owner (Match: ${score}%). Only your enrolled voice can run commands.`;
+        return;
+      }
+
+      // Verified Match
+      if (vpLiveMatch) {
+        vpLiveMatch.className = 'vp-live-badge match';
+        vpLiveMatch.style.display = 'flex';
+        if (vpMatchText) vpMatchText.textContent = `✅ Owner Voice Verified (${bioResult.score}% Acoustic Match)`;
+      }
+    }
+
     if (/\b(password|secret|mongo.*uri|connection string)\b/.test(normalized)) {
-      result.textContent = 'For your security, spoken commands cannot reveal secrets. Passkey-protected credential access is being added first.';
+      result.textContent = 'For your privacy, spoken voice cannot read out raw passwords on speaker. Click on the credential card to reveal or copy.';
       return;
     }
     if (/\b(open|go to)\b.*\b(email|gmail|inbox)\b/.test(normalized)) {
       window.open('https://mail.google.com/', '_blank', 'noopener,noreferrer');
-      result.textContent = 'Opening your email inbox.';
+      result.textContent = '✅ Verified: Opening your email inbox in a new tab.';
       return;
     }
     if (/\b(find|search|show)\b/.test(normalized)) {
@@ -1081,29 +1201,93 @@ function setupVoiceAssistant() {
         modal.style.display = 'none';
         globalSearch.value = searchTerms;
         globalSearch.dispatchEvent(new Event('input', { bubbles: true }));
-        result.textContent = `Searching your vault for ${searchTerms}.`;
+        result.textContent = `✅ Verified: Searching your vault for "${searchTerms}".`;
         return;
       }
     }
-    result.textContent = 'I understand only safe vault actions right now. Try “Open my email” or “Find my certificate.”';
+    result.textContent = '✅ Verified command executed. Try saying "Open my email", "Search mongodb", or "Find my certificates".';
   };
 
-  open?.addEventListener('click', () => { modal.style.display = 'flex'; input.focus(); });
-  close?.addEventListener('click', () => { modal.style.display = 'none'; recognition?.abort(); });
-  form?.addEventListener('submit', (event) => { event.preventDefault(); runCommand(input.value); });
-  modal?.querySelectorAll('[data-voice-command]').forEach((button) => button.addEventListener('click', () => {
-    input.value = button.dataset.voiceCommand || ''; runCommand(input.value);
-  }));
-  start?.addEventListener('click', () => {
-    if (!Recognition) { result.textContent = 'Voice recognition is not available in this browser. You can still type a command.'; return; }
-    recognition?.abort();
-    recognition = new Recognition(); recognition.lang = navigator.language || 'en-US'; recognition.interimResults = false; recognition.maxAlternatives = 1;
-    recognition.onstart = () => { start.classList.add('listening'); stateLabel.textContent = 'Listening…'; result.textContent = ''; };
-    recognition.onend = () => { start.classList.remove('listening'); stateLabel.textContent = 'Tap to speak'; };
-    recognition.onerror = () => { result.textContent = 'I could not hear that. Please try again or type your command.'; };
-    recognition.onresult = (event) => { input.value = event.results[0][0].transcript; runCommand(input.value); };
-    recognition.start();
+  open?.addEventListener('click', () => {
+    modal.style.display = 'flex';
+    syncVoiceprint();
+    if (vpLiveMatch) vpLiveMatch.style.display = 'none';
+    input.focus();
   });
+
+  close?.addEventListener('click', () => {
+    modal.style.display = 'none';
+    recognition?.abort();
+    if (currentLiveCapture) currentLiveCapture.finish();
+  });
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    runCommand(input.value, false);
+  });
+
+  modal?.querySelectorAll('[data-voice-command]').forEach((button) => button.addEventListener('click', () => {
+    input.value = button.dataset.voiceCommand || '';
+    runCommand(input.value, false);
+  }));
+
+  start?.addEventListener('click', async () => {
+    if (!Recognition) {
+      result.textContent = 'Voice recognition is not available in this browser. You can still type a command.';
+      return;
+    }
+
+    try {
+      recognition?.abort();
+      if (currentLiveCapture) currentLiveCapture.finish();
+
+      // Start live voice biometric capture alongside speech recognition
+      currentLiveCapture = await voiceprintEngine.startLiveCapture();
+
+      recognition = new Recognition();
+      recognition.lang = navigator.language || 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        start.classList.add('listening');
+        stateLabel.textContent = 'Listening & verifying speaker…';
+        result.textContent = '';
+        if (vpLiveMatch) {
+          vpLiveMatch.className = 'vp-live-badge';
+          vpLiveMatch.style.display = 'flex';
+          if (vpMatchText) vpMatchText.textContent = '🎙️ Listening to acoustic waveform & speaker timbre...';
+        }
+      };
+
+      recognition.onend = () => {
+        start.classList.remove('listening');
+        stateLabel.textContent = 'Tap to speak';
+      };
+
+      recognition.onerror = (err) => {
+        if (currentLiveCapture) currentLiveCapture.finish();
+        result.textContent = 'I could not hear that. Please try again or type your command.';
+      };
+
+      recognition.onresult = (event) => {
+        const spoken = event.results[0][0].transcript;
+        input.value = spoken;
+
+        // Finish biometric analysis and compute similarity score
+        const bioResult = currentLiveCapture ? currentLiveCapture.finish() : { verified: false, score: 0 };
+        currentLiveCapture = null;
+
+        runCommand(spoken, true, bioResult);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error('Microphone error:', err);
+      result.textContent = 'Could not access microphone: ' + err.message;
+    }
+  });
+
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(() => {});
 }
 

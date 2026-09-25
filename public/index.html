@@ -285,24 +285,64 @@
 
     <!-- ================= MODALS ================= -->
 
-    <!-- 1. AI GROUNDED RETRIEVAL MODAL -->
+    <!-- 1. VOICE ASSISTANT & BIOMETRICS MODAL -->
     <div id="voice-modal" class="modal-overlay" style="display: none;">
       <div class="modal-dialog voice-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="voice-modal-title">
         <div class="modal-header">
-          <div><h3 id="voice-modal-title">Voice assistant</h3><p class="modal-subtitle">Speak a vault command. Sensitive details always stay locked.</p></div>
+          <div>
+            <h3 id="voice-modal-title">Voice Assistant & Biometrics</h3>
+            <p class="modal-subtitle">Locked to your voiceprint. Unrecognized speakers are automatically blocked.</p>
+          </div>
           <button type="button" class="modal-close-btn" id="btn-close-voice-modal" aria-label="Close voice assistant">✕</button>
         </div>
+
         <div class="modal-body voice-modal-body">
-          <button type="button" class="voice-orb" id="btn-start-voice" aria-label="Start listening"><span>◉</span></button>
-          <p id="voice-state" class="voice-state">Tap to speak</p>
-          <p id="voice-transcript" class="voice-transcript" aria-live="polite">Your spoken command will appear here.</p>
-          <form id="voice-command-form" class="voice-command-form">
-            <label class="sr-only" for="voice-command-input">Voice command</label>
-            <input id="voice-command-input" class="form-input" type="text" placeholder="Try: Open my email" autocomplete="off">
-            <button class="btn btn-primary" type="submit">Run</button>
-          </form>
-          <p id="voice-result" class="voice-result" aria-live="polite"></p>
-          <div class="voice-examples"><span>Examples</span><button type="button" data-voice-command="Open my email">Open my email</button><button type="button" data-voice-command="Find my certificate">Find my certificate</button><button type="button" data-voice-command="Show my Gmail password">Show my Gmail password</button></div>
+          <!-- Voiceprint Security Status Card -->
+          <div class="voiceprint-status-card" id="voiceprint-status-card">
+            <div class="vp-status-header">
+              <span class="vp-status-icon" id="vp-badge-icon">🔒</span>
+              <div class="vp-status-info">
+                <span class="vp-status-title" id="vp-status-title">Voiceprint: Not Calibrated</span>
+                <span class="vp-status-sub" id="vp-status-sub">Enroll your voice so commands only respond to you.</span>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-white" id="btn-calibrate-voice">🎙️ Calibrate</button>
+            </div>
+            <!-- Live Verification Badge -->
+            <div id="vp-live-match" class="vp-live-badge" style="display: none;">
+              <span id="vp-match-text">Comparing voice acoustics...</span>
+            </div>
+          </div>
+
+          <!-- Calibration Active State Box -->
+          <div id="voice-enroll-box" class="voice-enroll-box" style="display: none;">
+            <h4>🎙️ Voice Calibration in Progress</h4>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 8px 0 12px;">Please speak clearly: <strong>"This is my voice authenticating for Personal AI Vault"</strong></p>
+            <div class="progress-bar-bg" style="height: 8px; border-radius: 4px; background: #27272a; overflow: hidden; margin-bottom: 8px;">
+              <div id="voice-enroll-progress" style="width: 0%; height: 100%; background: #38bdf8; transition: width 0.1s linear;"></div>
+            </div>
+            <p id="voice-enroll-status" style="font-size: 0.8rem; color: var(--accent-primary);">Listening and analyzing vocal acoustics...</p>
+          </div>
+
+          <!-- Main Command Interface -->
+          <div id="voice-main-interface">
+            <button type="button" class="voice-orb" id="btn-start-voice" aria-label="Start listening"><span>◉</span></button>
+            <p id="voice-state" class="voice-state">Tap to speak</p>
+            <p id="voice-transcript" class="voice-transcript" aria-live="polite">Your spoken command will appear here.</p>
+            
+            <form id="voice-command-form" class="voice-command-form">
+              <label class="sr-only" for="voice-command-input">Voice command</label>
+              <input id="voice-command-input" class="form-input" type="text" placeholder="Try: Open my email" autocomplete="off">
+              <button class="btn btn-primary" type="submit">Run</button>
+            </form>
+            
+            <p id="voice-result" class="voice-result" aria-live="polite"></p>
+            <div class="voice-examples">
+              <span>Examples</span>
+              <button type="button" data-voice-command="Open my email">Open my email</button>
+              <button type="button" data-voice-command="Find my certificate">Find my certificate</button>
+              <button type="button" data-voice-command="Search mongodb">Search mongodb</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1725,6 +1725,74 @@ input, textarea, select {
 .voice-examples button:hover { background:#ebe6dd; color:var(--text-primary); }
 @media (max-width:600px) { .voice-command-form { flex-direction:column; } .voice-command-form .btn { width:100%; } }
 
+/* Voiceprint Biometrics UI */
+.voiceprint-status-card {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.vp-status-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.vp-status-icon {
+  font-size: 1.4rem;
+}
+.vp-status-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vp-status-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fafafa;
+}
+.vp-status-sub {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+}
+.vp-live-badge {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.vp-live-badge.match {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.vp-live-badge.mismatch {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.voice-enroll-box {
+  background: #18181b;
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+  animation: pulseEnroll 2s infinite ease-in-out;
+}
+@keyframes pulseEnroll {
+  0%, 100% { border-color: #38bdf8; }
+  50% { border-color: #0284c7; }
+}
+
+
 /* ================= CLAUDE-INSPIRED WORKSPACE REFINEMENT ================= */
 
 button:focus-visible,

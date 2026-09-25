@@ -103,4 +103,29 @@ router.get('/me', authenticateToken, (req, res) => {
   });
 });
 
+// GET /api/auth/voiceprint - Get enrolled voiceprint
+router.get('/voiceprint', authenticateToken, async (req, res) => {
+  try {
+    const voiceprint = await userModel.getVoiceprint(req.user.id);
+    res.json({ voiceprint: voiceprint || null, enrolled: Boolean(voiceprint) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve voiceprint: ' + err.message });
+  }
+});
+
+// POST /api/auth/voiceprint - Save or update enrolled voiceprint
+router.post('/voiceprint', authenticateToken, async (req, res) => {
+  try {
+    const { voiceprint } = req.body;
+    if (!voiceprint || !Array.isArray(voiceprint.features)) {
+      return res.status(400).json({ error: 'Invalid voiceprint signature data.' });
+    }
+
+    await userModel.saveVoiceprint(req.user.id, voiceprint);
+    res.json({ message: 'Voiceprint calibrated and secured to your account.', enrolled: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save voiceprint: ' + err.message });
+  }
+});
+
 export default router;

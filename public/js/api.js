@@ -73,6 +73,17 @@ export const api = {
       return await api.request('/auth/me');
     },
 
+    async getVoiceprint() {
+      return await api.request('/auth/voiceprint');
+    },
+
+    async saveVoiceprint(voiceprint) {
+      return await api.request('/auth/voiceprint', {
+        method: 'POST',
+        body: JSON.stringify({ voiceprint })
+      });
+    },
+
     logout() {
       api.setToken(null);
     }

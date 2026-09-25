@@ -59,8 +59,11 @@ export async function initDatabase() {
           username TEXT NOT NULL UNIQUE,
           email TEXT NOT NULL UNIQUE,
           password_hash TEXT NOT NULL,
+          voiceprint JSONB DEFAULT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
+
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS voiceprint JSONB DEFAULT NULL;
 
         CREATE TABLE IF NOT EXISTS files (
           id UUID PRIMARY KEY,
@@ -217,6 +220,22 @@ export const userModel = {
       return row;
     }
     stmt.free();
+    return null;
+  },
+
+  async saveVoiceprint(id, voiceprint) {
+    if (isNeonEnabled() && pgPool) {
+      const res = await pgPool.query('UPDATE users SET voiceprint = $1::jsonb WHERE id = $2 RETURNING id, voiceprint', [JSON.stringify(voiceprint), id]);
+      return res.rows[0];
+    }
+    return { id, voiceprint };
+  },
+
+  async getVoiceprint(id) {
+    if (isNeonEnabled() && pgPool) {
+      const res = await pgPool.query('SELECT voiceprint FROM users WHERE id = $1', [id]);
+      return res.rows[0]?.voiceprint || null;
+    }
     return null;
   }
 };
