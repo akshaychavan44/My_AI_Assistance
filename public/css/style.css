@@ -1792,6 +1792,82 @@ input, textarea, select {
   50% { border-color: #0284c7; }
 }
 
+/* Biometric Fallback Modal */
+.biometric-modal-dialog {
+  max-width: 480px;
+}
+.bio-prompt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.bio-score-banner {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.84rem;
+}
+.bio-score-val {
+  font-weight: 700;
+  color: #f87171;
+}
+.bio-threshold-tag {
+  font-size: 0.72rem;
+  background: #27272a;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #d4d4d8;
+}
+.bio-command-preview {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.bio-preview-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.bio-command-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fafafa;
+  margin-top: 4px;
+}
+.bio-hardware-sensor-box {
+  background: #09090b;
+  border: 1px solid #27272a;
+  border-radius: var(--radius-lg);
+  padding: 20px 16px;
+  text-align: center;
+}
+.fingerprint-scan-anim {
+  margin-bottom: 10px;
+  display: inline-block;
+  animation: floatScan 2s ease-in-out infinite;
+}
+@keyframes floatScan {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.bio-modal-status {
+  font-size: 0.82rem;
+  text-align: center;
+  min-height: 20px;
+}
+.bio-modal-status.error {
+  color: #f87171;
+}
+.bio-modal-status.success {
+  color: #4ade80;
+}
 
 /* ================= CLAUDE-INSPIRED WORKSPACE REFINEMENT ================= */
 

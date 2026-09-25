@@ -8,7 +8,7 @@ export class VoiceprintEngine {
     this.analyser = null;
     this.mediaStream = null;
     this.enrolledVoiceprint = null;
-    this.threshold = 0.72; // Similarity threshold (72% match required)
+    this.threshold = 0.80; // Similarity threshold (80% match required)
   }
 
   async initAudio() {

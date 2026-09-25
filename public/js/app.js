@@ -1070,6 +1070,17 @@ function setupVoiceAssistant() {
   const enrollProgress = document.getElementById('voice-enroll-progress');
   const enrollStatus = document.getElementById('voice-enroll-status');
 
+  // Biometric Fallback Modal elements
+  const bioModal = document.getElementById('biometric-modal');
+  const btnCloseBio = document.getElementById('btn-close-bio-modal');
+  const btnCancelBio = document.getElementById('btn-cancel-bio');
+  const btnTriggerHardwareBio = document.getElementById('btn-trigger-hardware-bio');
+  const bioScoreVal = document.getElementById('bio-score-val');
+  const bioPendingCommand = document.getElementById('bio-pending-command');
+  const bioModalStatus = document.getElementById('bio-modal-status');
+
+  let pendingVoiceCommand = null;
+
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
   let currentLiveCapture = null;
@@ -1104,12 +1115,12 @@ function setupVoiceAssistant() {
     if (voiceprintEngine.isEnrolled()) {
       if (vpBadgeIcon) vpBadgeIcon.textContent = '🟢';
       if (vpStatusTitle) vpStatusTitle.textContent = `Voiceprint: Verified Owner (${state.currentUser?.username || 'Owner'})`;
-      if (vpStatusSub) vpStatusSub.textContent = 'Owner-only protection active. Unrecognized voices are blocked.';
+      if (vpStatusSub) vpStatusSub.textContent = 'Owner-only protection active (80% match required). Below 80% triggers biometrics.';
       if (btnCalibrate) btnCalibrate.textContent = '🔄 Re-calibrate';
     } else {
       if (vpBadgeIcon) vpBadgeIcon.textContent = '🟡';
       if (vpStatusTitle) vpStatusTitle.textContent = 'Voiceprint: Not Calibrated';
-      if (vpStatusSub) vpStatusSub.textContent = 'Calibrate your voice so the vault only accepts commands from you.';
+      if (vpStatusSub) vpStatusSub.textContent = 'Calibrate your voice so commands run instantly with ≥80% voice match.';
       if (btnCalibrate) btnCalibrate.textContent = '🎙️ Calibrate';
     }
   }
@@ -1123,7 +1134,6 @@ function setupVoiceAssistant() {
       if (enrollStatus) enrollStatus.textContent = 'Analyzing your vocal harmonics & acoustics (Speak for 4 seconds)...';
 
       const voiceprint = await voiceprintEngine.startCalibration(4500, (pct) => {
-        if (enrollProgress) enrollProgress.width = `${pct}%`;
         if (enrollProgress) enrollProgress.style.width = `${pct}%`;
       });
 
@@ -1136,7 +1146,7 @@ function setupVoiceAssistant() {
       setTimeout(() => {
         if (enrollBox) enrollBox.style.display = 'none';
         if (mainInterface) mainInterface.style.display = 'block';
-        if (result) result.textContent = 'Voice locked to you! Only your voice can execute vault commands now.';
+        if (result) result.textContent = 'Voice locked to you! Only your voice (≥80% match) can execute vault commands now.';
       }, 1000);
     } catch (err) {
       if (enrollStatus) enrollStatus.textContent = '⚠️ ' + err.message;
@@ -1147,43 +1157,21 @@ function setupVoiceAssistant() {
     }
   });
 
-  const runCommand = (raw, isVoiceInput = false, bioResult = null) => {
-    const command = raw.trim();
-    const normalized = command.toLowerCase();
-    transcript.textContent = command || 'Please say or type a command.';
-    result.textContent = '';
-    if (!command) return;
-
-    // If spoken via voice, enforce Speaker Biometric Verification
-    if (isVoiceInput) {
-      if (!voiceprintEngine.isEnrolled()) {
-        if (vpLiveMatch) {
-          vpLiveMatch.className = 'vp-live-badge mismatch';
-          vpLiveMatch.style.display = 'flex';
-          if (vpMatchText) vpMatchText.textContent = '⚠️ Voiceprint Not Enrolled — Tap "Calibrate" above to lock to your voice.';
-        }
-        result.textContent = '⚠️ Please calibrate your voice first by clicking "Calibrate" above to enable owner-only voice control.';
-        return;
-      }
-
-      if (!bioResult || !bioResult.verified) {
-        const score = bioResult ? bioResult.score : 0;
-        if (vpLiveMatch) {
-          vpLiveMatch.className = 'vp-live-badge mismatch';
-          vpLiveMatch.style.display = 'flex';
-          if (vpMatchText) vpMatchText.textContent = `🚫 Unrecognized Speaker (Acoustic Match: ${score}% — required 72%)`;
-        }
-        result.textContent = `🚫 Command Blocked: Voice not recognized as vault owner (Match: ${score}%). Only your enrolled voice can run commands.`;
-        return;
-      }
-
-      // Verified Match
-      if (vpLiveMatch) {
-        vpLiveMatch.className = 'vp-live-badge match';
-        vpLiveMatch.style.display = 'flex';
-        if (vpMatchText) vpMatchText.textContent = `✅ Owner Voice Verified (${bioResult.score}% Acoustic Match)`;
-      }
+  // Prompt Device Biometric Verification Modal when voice match is < 80%
+  function promptBiometricFallback(command, score, reasonText) {
+    pendingVoiceCommand = command;
+    if (bioScoreVal) bioScoreVal.textContent = `${score}%`;
+    if (bioPendingCommand) bioPendingCommand.textContent = `"${command}"`;
+    if (bioModalStatus) {
+      bioModalStatus.className = 'bio-modal-status';
+      bioModalStatus.textContent = reasonText || 'Voice recognition was below 80%. Verify with your fingerprint or device PIN to proceed.';
     }
+    if (bioModal) bioModal.style.display = 'flex';
+  }
+
+  // Execute the verified action (either via >=80% voice match or device biometrics)
+  const executeVerifiedCommand = (command, authMethod = 'Voice') => {
+    const normalized = command.toLowerCase();
 
     if (/\b(password|secret|mongo.*uri|connection string)\b/.test(normalized)) {
       result.textContent = 'For your privacy, spoken voice cannot read out raw passwords on speaker. Click on the credential card to reveal or copy.';
@@ -1191,7 +1179,7 @@ function setupVoiceAssistant() {
     }
     if (/\b(open|go to)\b.*\b(email|gmail|inbox)\b/.test(normalized)) {
       window.open('https://mail.google.com/', '_blank', 'noopener,noreferrer');
-      result.textContent = '✅ Verified: Opening your email inbox in a new tab.';
+      result.textContent = `✅ [${authMethod} Verified] Opening your email inbox in a new tab.`;
       return;
     }
     if (/\b(find|search|show)\b/.test(normalized)) {
@@ -1201,11 +1189,141 @@ function setupVoiceAssistant() {
         modal.style.display = 'none';
         globalSearch.value = searchTerms;
         globalSearch.dispatchEvent(new Event('input', { bubbles: true }));
-        result.textContent = `✅ Verified: Searching your vault for "${searchTerms}".`;
+        result.textContent = `✅ [${authMethod} Verified] Searching your vault for "${searchTerms}".`;
         return;
       }
     }
-    result.textContent = '✅ Verified command executed. Try saying "Open my email", "Search mongodb", or "Find my certificates".';
+    result.textContent = `✅ [${authMethod} Verified] Command executed: "${command}". Try saying "Open my email", "Search mongodb", or "Find my certificates".`;
+  };
+
+  // Hardware Biometrics Verification (WebAuthn Platform Authenticator — Fingerprint / Windows Hello / Touch ID / PIN)
+  async function triggerPlatformBiometrics() {
+    try {
+      if (!window.PublicKeyCredential) {
+        throw new Error('WebAuthn / Biometrics is not supported in this browser.');
+      }
+
+      if (bioModalStatus) {
+        bioModalStatus.className = 'bio-modal-status';
+        bioModalStatus.textContent = '👆 Scanning fingerprint / Windows Hello / Touch ID...';
+      }
+
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const userId = new Uint8Array(16);
+      window.crypto.getRandomValues(userId);
+
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge,
+          rp: {
+            name: 'Personal AI Vault',
+            id: window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname
+          },
+          user: {
+            id: userId,
+            name: state.currentUser?.email || 'owner@vault.local',
+            displayName: state.currentUser?.username || 'Vault Owner'
+          },
+          pubKeyCredParams: [
+            { alg: -7, type: 'public-key' },
+            { alg: -257, type: 'public-key' }
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            residentKey: 'preferred'
+          },
+          timeout: 60000,
+          attestation: 'none'
+        }
+      });
+
+      if (credential) {
+        if (bioModalStatus) {
+          bioModalStatus.className = 'bio-modal-status success';
+          bioModalStatus.textContent = '✅ Biometric Authentication Succeeded! Proceeding with command...';
+        }
+
+        setTimeout(() => {
+          if (bioModal) bioModal.style.display = 'none';
+          if (pendingVoiceCommand) {
+            const cmd = pendingVoiceCommand;
+            pendingVoiceCommand = null;
+            executeVerifiedCommand(cmd, 'Biometric');
+          }
+        }, 800);
+      }
+    } catch (err) {
+      console.warn('Biometric challenge notice:', err);
+      if (bioModalStatus) {
+        bioModalStatus.className = 'bio-modal-status error';
+        if (err.name === 'NotAllowedError') {
+          bioModalStatus.textContent = '❌ Biometric verification was cancelled. Command blocked.';
+        } else {
+          bioModalStatus.textContent = `❌ Verification error: ${err.message || 'Sensor unavailable'}`;
+        }
+      }
+    }
+  }
+
+  btnTriggerHardwareBio?.addEventListener('click', triggerPlatformBiometrics);
+  btnCloseBio?.addEventListener('click', () => {
+    if (bioModal) bioModal.style.display = 'none';
+    pendingVoiceCommand = null;
+  });
+  btnCancelBio?.addEventListener('click', () => {
+    if (bioModal) bioModal.style.display = 'none';
+    pendingVoiceCommand = null;
+  });
+
+  const runCommand = (raw, isVoiceInput = false, bioResult = null) => {
+    const command = raw.trim();
+    transcript.textContent = command || 'Please say or type a command.';
+    result.textContent = '';
+    if (!command) return;
+
+    // If spoken via voice, enforce 80% voice match threshold
+    if (isVoiceInput) {
+      if (!voiceprintEngine.isEnrolled()) {
+        if (vpLiveMatch) {
+          vpLiveMatch.className = 'vp-live-badge mismatch';
+          vpLiveMatch.style.display = 'flex';
+          if (vpMatchText) vpMatchText.textContent = '⚠️ Voiceprint Not Calibrated (80% match required) — Fallback to Biometrics';
+        }
+        result.textContent = '⚠️ Voiceprint not calibrated. Please authenticate with device biometrics to proceed.';
+        promptBiometricFallback(command, 0, 'Voiceprint has not been calibrated yet. Authenticate via biometrics to proceed.');
+        return;
+      }
+
+      const score = bioResult ? bioResult.score : 0;
+      const isMatch = bioResult && bioResult.verified; // threshold >= 80%
+
+      if (!isMatch) {
+        // Below 80% match -> Trigger Biometric Verification Fallback
+        if (vpLiveMatch) {
+          vpLiveMatch.className = 'vp-live-badge mismatch';
+          vpLiveMatch.style.display = 'flex';
+          if (vpMatchText) vpMatchText.textContent = `⚠️ Voice Match: ${score}% (Below 80% required) — Biometrics Triggered`;
+        }
+        result.textContent = `⚠️ Voice match (${score}%) is below the 80% threshold. Biometric verification required.`;
+        promptBiometricFallback(command, score, `Acoustic match was ${score}%, which is below the 80% security threshold.`);
+        return;
+      }
+
+      // Verified Match >= 80%
+      if (vpLiveMatch) {
+        vpLiveMatch.className = 'vp-live-badge match';
+        vpLiveMatch.style.display = 'flex';
+        if (vpMatchText) vpMatchText.textContent = `✅ Owner Voice Verified (${score}% Match ≥ 80%)`;
+      }
+      executeVerifiedCommand(command, 'Voice');
+      return;
+    }
+
+    // Typed or clicked command
+    executeVerifiedCommand(command, 'Direct');
   };
 
   open?.addEventListener('click', () => {
