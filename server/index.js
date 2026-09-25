@@ -15,55 +15,70 @@ import statusRoutes from './routes/status.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
-  // Initialize SQLite database
-  await initDatabase();
+const app = express();
 
-  const app = express();
-
-  // Security and utility middleware
-  app.use(cors({
-    origin: true,
-    credentials: true
-  }));
-
-  app.use(express.json({ limit: '20mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '20mb' }));
-
-  // Serve static frontend UI from public/
-  app.use(express.static(path.join(__dirname, '..', 'public')));
-
-  // API Routes
-  app.use('/api/auth', authRoutes);
-  app.use('/api/files', fileRoutes);
-  app.use('/api/notes', noteRoutes);
-  app.use('/api/credentials', credentialRoutes);
-  app.use('/api/search', searchRoutes);
-  app.use('/api/status', statusRoutes);
-
-  // SPA Fallback for client routes
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'Endpoint not found' });
+// Ensure database is initialized
+let dbInitialized = false;
+app.use(async (req, res, next) => {
+  if (!dbInitialized) {
+    try {
+      await initDatabase();
+      dbInitialized = true;
+    } catch (err) {
+      console.error('Database initialization error:', err.message);
     }
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-  });
+  }
+  next();
+});
 
-  // Start Server
-  app.listen(config.port, '0.0.0.0', () => {
-    console.log(`\n======================================================`);
-    console.log(`🔒 Personal AI Vault running on http://localhost:${config.port}`);
-    console.log(`📱 Access from phone on your local network: http://<your-laptop-ip>:${config.port}`);
-    console.log(`======================================================`);
-    
-    const status = getServicesStatus();
-    console.log(`☁️ Cloud Storage: ${status.storage.connected ? '🟢 Connected (' + status.storage.provider + ')' : '🟡 Local Staging Mode (Cloud credentials needed in .env)'}`);
-    console.log(`💾 Database: 🟢 Active (${status.database.type})`);
-    console.log(`🧠 AI Retrieval: ${status.ai.connected ? '🟢 Connected (' + status.ai.provider + ')' : '🟡 AI Key needed in .env (Add GEMINI_API_KEY for free AI)'}`);
-    console.log(`======================================================\n`);
+// Security and utility middleware
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// Serve static frontend UI from public/
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/notes', noteRoutes);
+app.use('/api/credentials', credentialRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/status', statusRoutes);
+
+// SPA Fallback for client routes
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'Endpoint not found' });
+  }
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// Start local server if not running inside serverless environment
+if (process.env.VERCEL !== '1') {
+  initDatabase().then(() => {
+    dbInitialized = true;
+    app.listen(config.port, '0.0.0.0', () => {
+      console.log(`\n======================================================`);
+      console.log(`🔒 Personal AI Vault running on http://localhost:${config.port}`);
+      console.log(`📱 Access from phone on your local network: http://<your-laptop-ip>:${config.port}`);
+      console.log(`======================================================`);
+      
+      const status = getServicesStatus();
+      console.log(`☁️ Cloud Storage: ${status.storage.connected ? '🟢 Connected (' + status.storage.provider + ')' : '🟡 Local Staging Mode (Cloud credentials needed in .env)'}`);
+      console.log(`💾 Database: 🟢 Active (${status.database.type})`);
+      console.log(`🧠 AI Retrieval: ${status.ai.connected ? '🟢 Connected (' + status.ai.provider + ')' : '🟡 AI Key needed in .env (Add GEMINI_API_KEY for free AI)'}`);
+      console.log(`======================================================\n`);
+    });
+  }).catch(err => {
+    console.error('Failed to start server:', err);
   });
 }
 
-startServer().catch(err => {
-  console.error('Failed to start server:', err);
-});
+export default app;
+
