@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment and sensitive keys
+.env
+.env.*
+*.json.key
+smiling-accord*.json
+google-service-account*.json
+gdrive-credentials.json
+gdrive-token.json
+
+# Local databases and temporary staging
+data/
+staging_temp/
+.neon/
+.neon
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db

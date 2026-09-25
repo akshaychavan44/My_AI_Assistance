@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#f8f7f4">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Personal AI Vault — Private Cloud Storage & Grounded Search</title>
+  <meta name="description" content="Private personal AI vault accessible from your phone and laptop. Upload PDFs, documents, images, and notes with cloud storage and grounded AI retrieval.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="theme-dark">
+  <div id="app">
+    <!-- AUTH VIEW (Displayed if not logged in) -->
+    <div id="auth-view" class="auth-wrapper" style="display: none;">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="vault-logo-badge">
+            <span class="logo-icon">🔒</span>
+          </div>
+          <h1>Personal AI Vault</h1>
+          <p class="auth-subtitle">Private cloud storage & grounded AI retrieval for your phone and laptop</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab-btn active" id="tab-login-btn">Sign In</button>
+          <button type="button" class="auth-tab-btn" id="tab-register-btn">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="auth-form">
+          <div class="form-group">
+            <label for="login-identifier">Username or Email</label>
+            <input type="text" id="login-identifier" class="form-input" placeholder="Enter your username or email" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+          </div>
+          <div id="login-error" class="form-error" style="display: none;"></div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="login-submit-btn">
+            <span>Sign In to Vault</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="auth-form" style="display: none;">
+          <div class="form-group">
+            <label for="reg-username">Username</label>
+            <input type="text" id="reg-username" class="form-input" placeholder="e.g. alex" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Email Address</label>
+            <input type="email" id="reg-email" class="form-input" placeholder="alex@example.com" required autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="reg-password">Password (min 6 characters)</label>
+            <input type="password" id="reg-password" class="form-input" placeholder="••••••••" minlength="6" required autocomplete="new-password">
+          </div>
+          <div id="register-error" class="form-error" style="display: none;"></div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="register-submit-btn">
+            <span>Create Private Vault</span>
+            <span class="btn-arrow">→</span>
+          </button>
+        </form>
+
+        <div class="auth-security-notice">
+          <div class="security-item">
+            <span class="sec-icon">🛡️</span>
+            <span>Protected Cloud Storage</span>
+          </div>
+          <div class="security-item">
+            <span class="sec-icon">🔑</span>
+            <span>API keys stay on server</span>
+          </div>
+          <div class="security-item">
+            <span class="sec-icon">🧠</span>
+            <span>Grounded AI answers</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APP VIEW (Displayed when authenticated) -->
+    <div id="main-view" class="app-container" style="display: none;">
+      
+      <!-- Top Navigation Header -->
+      <header class="navbar">
+        <div class="nav-brand">
+          <span class="brand-icon">🔒</span>
+          <span class="brand-title">AI Vault</span>
+        </div>
+
+        <div class="nav-center-search">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="global-search-input" placeholder="Search filenames, documents, OCR text, notes..." autocomplete="off">
+            <button type="button" class="search-clear-btn" id="search-clear-btn" style="display: none;">✕</button>
+          </div>
+          <button type="button" class="btn btn-ai-toggle" id="btn-open-ai-modal" title="Ask AI Assistant">
+            <span class="ai-sparkle">✨</span>
+            <span class="btn-ai-text">Ask AI</span>
+          </button>
+          <button type="button" class="nav-btn-icon voice-launch-btn" id="btn-open-voice-modal" title="Voice commands" aria-label="Open voice commands">
+            <span aria-hidden="true">◉</span><span class="btn-icon-label">Voice</span>
+          </button>
+        </div>
+
+        <div class="nav-actions">
+          <button type="button" class="nav-btn-icon" id="btn-status-modal" title="Cloud & AI Status">
+            <span class="status-indicator-dot" id="header-status-dot"></span>
+            <span class="btn-icon-label">Status</span>
+          </button>
+          <div class="user-menu-pill">
+            <span class="user-avatar" id="nav-user-avatar">U</span>
+            <span class="user-name" id="nav-user-name">User</span>
+            <button type="button" class="logout-btn" id="btn-logout" title="Sign Out">
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Layout Body -->
+      <div class="app-body">
+        
+        <!-- Sidebar Navigation (Desktop) -->
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-label">VAULT NAVIGATION</div>
+            <nav class="sidebar-nav">
+              <button class="nav-item active" data-filter="all">
+                <span class="nav-icon">📁</span>
+                <span class="nav-text">All Items</span>
+                <span class="nav-count" id="count-all">0</span>
+              </button>
+              <button class="nav-item" data-filter="pdf">
+                <span class="nav-icon">📕</span>
+                <span class="nav-text">PDFs</span>
+                <span class="nav-count" id="count-pdf">0</span>
+              </button>
+              <button class="nav-item" data-filter="image">
+                <span class="nav-icon">🖼️</span>
+                <span class="nav-text">Images & OCR</span>
+                <span class="nav-count" id="count-image">0</span>
+              </button>
+              <button class="nav-item" data-filter="doc">
+                <span class="nav-icon">📄</span>
+                <span class="nav-text">Word & Docs</span>
+                <span class="nav-count" id="count-doc">0</span>
+              </button>
+              <button class="nav-item" data-filter="note">
+                <span class="nav-icon">📝</span>
+                <span class="nav-text">Personal Notes</span>
+                <span class="nav-count" id="count-note">0</span>
+              </button>
+              <button class="nav-item" data-filter="credential">
+                <span class="nav-icon">🔑</span>
+                <span class="nav-text">Passwords & Logins</span>
+                <span class="nav-count" id="count-credential">0</span>
+              </button>
+            </nav>
+          </div>
+
+          <div class="sidebar-section quick-actions-section">
+            <button type="button" class="btn btn-primary btn-block" id="btn-open-upload">
+              <span>+ Upload Files</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-block" id="btn-open-note">
+              <span>+ New Note</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-block" id="btn-open-credential">
+              <span>+ Store Password / URI</span>
+            </button>
+          </div>
+
+          <div class="sidebar-status-card" id="sidebar-status-widget">
+            <div class="status-widget-header">
+              <span class="widget-title">Connection Status</span>
+              <span class="status-badge-mini" id="storage-status-badge">Checking...</span>
+            </div>
+            <div class="status-widget-rows">
+              <div class="status-row">
+                <span class="status-label">Storage:</span>
+                <span class="status-val" id="storage-status-text">...</span>
+              </div>
+              <div class="status-row">
+                <span class="status-label">AI RAG:</span>
+                <span class="status-val" id="ai-status-text">...</span>
+              </div>
+            </div>
+            <button type="button" class="widget-link-btn" id="btn-widget-details">View Setup & Costs →</button>
+          </div>
+        </aside>
+
+        <!-- Main Content Feed Area -->
+        <main class="main-content">
+          
+          <!-- Mobile Top Quick Bar -->
+          <div class="mobile-quick-bar">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-mobile-upload">+ Upload</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-mobile-note">+ Note</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-mobile-credential">+ Password</button>
+            <button type="button" class="btn btn-ai-sm" id="btn-mobile-ai">✨ Ask AI</button>
+          </div>
+
+          <!-- Banner if Storage or AI not connected -->
+          <div id="service-notice-banner" class="notice-banner" style="display: none;">
+            <div class="notice-content">
+              <span class="notice-icon" id="banner-icon">ℹ️</span>
+              <div class="notice-text">
+                <strong id="banner-title">Configuration Notice</strong>
+                <p id="banner-desc">Details...</p>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-white" id="banner-action-btn">Configure</button>
+          </div>
+
+          <!-- Vault Header & View Controls -->
+          <div class="vault-controls-bar">
+            <div class="controls-left">
+              <h2 id="current-view-title" class="view-heading">All Items</h2>
+              <span class="view-item-count" id="view-item-count">0 items</span>
+            </div>
+            <div class="controls-right">
+              <!-- Mobile filter dropdown -->
+              <div class="mobile-filter-select">
+                <select id="mobile-filter-dropdown" class="form-select">
+                  <option value="all">All Items</option>
+                  <option value="pdf">PDFs</option>
+                  <option value="image">Images & OCR</option>
+                  <option value="doc">Word & Docs</option>
+                  <option value="note">Notes</option>
+                  <option value="credential">Passwords & Logins</option>
+                </select>
+              </div>
+
+              <!-- View switch: Grid vs List -->
+              <div class="view-switcher">
+                <button type="button" class="view-btn active" id="btn-view-grid" title="Grid View">⊞</button>
+                <button type="button" class="view-btn" id="btn-view-list" title="List View">☰</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Search Results Header (Displayed when searching) -->
+          <div id="search-results-info" class="search-results-bar" style="display: none;">
+            <span>Showing results for "<strong id="search-query-display"></strong>"</span>
+            <button type="button" class="btn-text-link" id="btn-reset-search">Clear Search</button>
+          </div>
+
+          <!-- Vault Items Container -->
+          <div id="vault-items-container" class="vault-grid">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="vault-empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon">✦</div>
+            <h3>How can your vault help today?</h3>
+            <p>Bring in a document or add a note, then search and ask questions across everything you keep here.</p>
+            <div class="empty-actions">
+              <button type="button" class="btn btn-primary" id="btn-empty-upload">Upload documents</button>
+              <button type="button" class="btn btn-secondary" id="btn-empty-note">Create a note</button>
+            </div>
+          </div>
+
+        </main>
+      </div>
+
+      <!-- Mobile Bottom Navigation Bar -->
+      <nav class="mobile-bottom-nav">
+        <button class="bottom-nav-item active" data-filter="all">
+          <span class="bnav-icon">📁</span>
+          <span>Vault</span>
+        </button>
+        <button class="bottom-nav-item" id="btn-bnav-ai">
+          <span class="bnav-icon">✨</span>
+          <span>Ask AI</span>
+        </button>
+        <button class="bottom-nav-item" id="btn-bnav-upload">
+          <span class="bnav-icon">📤</span>
+          <span>Upload</span>
+        </button>
+        <button class="bottom-nav-item" id="btn-bnav-note">
+          <span class="bnav-icon">📝</span>
+          <span>Note</span>
+        </button>
+        <button class="bottom-nav-item" id="btn-bnav-status">
+          <span class="bnav-icon">⚙️</span>
+          <span>Status</span>
+        </button>
+      </nav>
+
+    </div>
+
+    <!-- ================= MODALS ================= -->
+
+    <!-- 1. AI GROUNDED RETRIEVAL MODAL -->
+    <div id="voice-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog voice-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="voice-modal-title">
+        <div class="modal-header">
+          <div><h3 id="voice-modal-title">Voice assistant</h3><p class="modal-subtitle">Speak a vault command. Sensitive details always stay locked.</p></div>
+          <button type="button" class="modal-close-btn" id="btn-close-voice-modal" aria-label="Close voice assistant">✕</button>
+        </div>
+        <div class="modal-body voice-modal-body">
+          <button type="button" class="voice-orb" id="btn-start-voice" aria-label="Start listening"><span>◉</span></button>
+          <p id="voice-state" class="voice-state">Tap to speak</p>
+          <p id="voice-transcript" class="voice-transcript" aria-live="polite">Your spoken command will appear here.</p>
+          <form id="voice-command-form" class="voice-command-form">
+            <label class="sr-only" for="voice-command-input">Voice command</label>
+            <input id="voice-command-input" class="form-input" type="text" placeholder="Try: Open my email" autocomplete="off">
+            <button class="btn btn-primary" type="submit">Run</button>
+          </form>
+          <p id="voice-result" class="voice-result" aria-live="polite"></p>
+          <div class="voice-examples"><span>Examples</span><button type="button" data-voice-command="Open my email">Open my email</button><button type="button" data-voice-command="Find my certificate">Find my certificate</button><button type="button" data-voice-command="Show my Gmail password">Show my Gmail password</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="ai-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog modal-lg ai-modal-dialog">
+        <div class="modal-header ai-modal-header">
+          <div class="ai-header-title">
+            <span class="ai-sparkle-large">✨</span>
+            <div>
+              <h3>Personal AI Assistant</h3>
+              <p class="modal-subtitle">Answers strictly from your uploaded files and cites exact sources</p>
+            </div>
+          </div>
+          <button type="button" class="modal-close-btn" id="btn-close-ai-modal">✕</button>
+        </div>
+
+        <div class="modal-body ai-modal-body">
+          <!-- Connection status badge inside AI modal -->
+          <div id="ai-connection-indicator" class="ai-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="ai-indicator-text">Checking AI connection...</span>
+          </div>
+
+          <!-- Prompt Suggestions Chips -->
+          <div class="ai-suggestions-box">
+            <span class="suggestions-label">Try asking:</span>
+            <div class="suggestion-chips">
+              <button type="button" class="chip-btn" data-query="Find the photo of my certificate">“Find the photo of my certificate”</button>
+              <button type="button" class="chip-btn" data-query="Which PDF mentions my internship?">“Which PDF mentions my internship?”</button>
+              <button type="button" class="chip-btn" data-query="Summarize all key documents in my vault">“Summarize all key documents”</button>
+              <button type="button" class="chip-btn" data-query="What receipts or invoices do I have?">“What receipts or invoices do I have?”</button>
+            </div>
+          </div>
+
+          <!-- AI Q&A Container -->
+          <div class="ai-qa-container">
+            <form id="ai-ask-form" class="ai-input-form">
+              <div class="ai-input-wrapper">
+                <input type="text" id="ai-question-input" placeholder="Ask anything about your uploaded documents, PDFs, certificates, notes..." autocomplete="off" required>
+                <button type="submit" class="btn btn-primary btn-ai-submit" id="ai-submit-btn">
+                  <span>Ask Vault</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Loading Spinner -->
+            <div id="ai-loading" class="ai-loading-state" style="display: none;">
+              <div class="ai-spinner"></div>
+              <p>Searching your vault documents and synthesizing grounded answer...</p>
+            </div>
+
+            <!-- Answer Box -->
+            <div id="ai-answer-card" class="ai-answer-wrapper" style="display: none;">
+              <div class="ai-answer-header">
+                <span class="ai-badge">Vault AI Answer</span>
+                <span class="ai-model-tag" id="ai-model-tag">Gemini 1.5 Flash</span>
+              </div>
+              
+              <div class="ai-answer-text" id="ai-answer-text">
+                <!-- Synthesized answer markdown rendered here -->
+              </div>
+
+              <!-- Cited Sources Section -->
+              <div class="ai-sources-section">
+                <h4>📄 Cited Vault Sources (<span id="ai-sources-count">0</span>)</h4>
+                <div class="ai-sources-list" id="ai-sources-list">
+                  <!-- Source cards injected here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Not Connected Notice (No Pretending) -->
+            <div id="ai-not-connected-card" class="card-warning-state" style="display: none;">
+              <div class="warning-icon">🔑</div>
+              <h4>AI Search Service Not Connected</h4>
+              <p>To ask questions with AI, add your <strong>Google Gemini API Key</strong> (100% Free tier available via Google AI Studio) or <strong>OpenAI API Key</strong> in your <code>.env</code> file.</p>
+              <div class="warning-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-open-status-from-ai">View Setup Guide & Free Tier</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. FILE UPLOAD MODAL -->
+    <div id="upload-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>Upload to Personal Vault</h3>
+          <button type="button" class="modal-close-btn" id="btn-close-upload-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="upload-dropzone" id="upload-dropzone">
+            <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,image/*">
+            <div class="dropzone-content">
+              <span class="dropzone-icon">☁️</span>
+              <h4>Drag & drop files here, or <span class="browse-link">browse</span></h4>
+              <p class="dropzone-sub">Supports PDFs, Word (.docx), Images (with OCR), Markdown, Text & CSV (up to 50MB each)</p>
+            </div>
+          </div>
+
+          <div id="selected-files-list" class="selected-files-container" style="display: none;">
+            <h4>Selected Files (<span id="selected-files-count">0</span>)</h4>
+            <div class="files-preview-list" id="files-preview-list"></div>
+            <div class="upload-actions">
+              <button type="button" class="btn btn-secondary" id="btn-clear-upload-files">Clear</button>
+              <button type="button" class="btn btn-primary" id="btn-start-upload">
+                <span id="upload-btn-text">Upload and Index Files</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="upload-progress-box" class="upload-progress-state" style="display: none;">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="upload-progress-fill"></div>
+            </div>
+            <p id="upload-progress-text">Uploading to cloud storage and extracting text...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. NEW NOTE MODAL -->
+    <div id="note-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <h3 id="note-modal-title">Create Personal Note</h3>
+          <button type="button" class="modal-close-btn" id="btn-close-note-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="note-form">
+            <div class="form-group">
+              <label for="note-title-input">Note Title</label>
+              <input type="text" id="note-title-input" class="form-input" placeholder="e.g. Internship Notes 2024, Certificate Details, Project Plan" required>
+            </div>
+            <div class="form-group">
+              <label for="note-tags-input">Tags (comma separated)</label>
+              <input type="text" id="note-tags-input" class="form-input" placeholder="internship, certificate, ideas, important">
+            </div>
+            <div class="form-group">
+              <label for="note-content-input">Note Content (Markdown supported)</label>
+              <textarea id="note-content-input" class="form-textarea" rows="10" placeholder="Type your personal notes, summaries, or details here... Everything is indexed for search and AI retrieval." required></textarea>
+            </div>
+            <div class="modal-footer-actions">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-note">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="btn-save-note">Save to Vault</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3B. NEW CREDENTIAL / PASSWORD MODAL -->
+    <div id="credential-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <h3 id="credential-modal-title">🔑 Store Password, Email & DB Secret</h3>
+          <button type="button" class="modal-close-btn" id="btn-close-credential-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="credential-form">
+            <div class="form-group">
+              <label for="cred-title-input">Heading / Service Name *</label>
+              <input type="text" id="cred-title-input" class="form-input" placeholder="e.g. Personal Email, MongoDB Atlas URI, Neon Database, GitHub Account" required>
+            </div>
+            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label for="cred-username-input">Email / Username</label>
+                <input type="text" id="cred-username-input" class="form-input" placeholder="e.g. akshay@gmail.com or db_admin">
+              </div>
+              <div class="form-group">
+                <label for="cred-password-input">Password / Secret / Connection URI *</label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="password" id="cred-password-input" class="form-input" placeholder="•••••••• or mongodb+srv://... or psql://..." required style="padding-right: 40px;">
+                  <button type="button" id="btn-toggle-cred-password" style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-muted, #94a3b8);" title="Show/Hide Password">👁️</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="cred-url-input">Website URL / Database Host (Optional)</label>
+              <input type="url" id="cred-url-input" class="form-input" placeholder="e.g. https://cloud.mongodb.com or https://console.neon.tech">
+            </div>
+            <div class="form-group">
+              <label for="cred-notes-input">Notes / Environment Details (Optional)</label>
+              <textarea id="cred-notes-input" class="form-textarea" rows="4" placeholder="e.g. Production cluster, SSL enabled, Port 5432, Primary recovery email... Everything is encrypted & indexed for AI retrieval."></textarea>
+            </div>
+            <div class="modal-footer-actions">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-credential">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="btn-save-credential">Save to Vault</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. FILE PREVIEW & DETAILS MODAL -->
+    <div id="preview-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog modal-xl preview-modal-dialog">
+        <div class="modal-header">
+          <div class="preview-header-meta">
+            <span class="preview-type-icon" id="preview-type-icon">📄</span>
+            <div>
+              <h3 id="preview-filename">filename.pdf</h3>
+              <p class="preview-submeta" id="preview-submeta">PDF • 1.2 MB • Uploaded May 2026</p>
+            </div>
+          </div>
+          <div class="preview-header-actions">
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-download-file">Download</button>
+            <button type="button" class="btn btn-sm btn-danger" id="btn-delete-file">Delete</button>
+            <button type="button" class="modal-close-btn" id="btn-close-preview-modal">✕</button>
+          </div>
+        </div>
+
+        <div class="modal-body preview-modal-body">
+          <div class="preview-layout">
+            <!-- Left: File Content Viewer -->
+            <div class="preview-viewer" id="preview-viewer-container">
+              <!-- Rendered image, iframe PDF, or text viewer -->
+            </div>
+
+            <!-- Right: Searchable Extracted Details & OCR -->
+            <div class="preview-sidebar">
+              <div class="sidebar-block">
+                <h4>Searchable Text / OCR</h4>
+                <div class="extracted-text-box" id="preview-extracted-text">
+                  [No text extracted]
+                </div>
+              </div>
+
+              <div class="sidebar-block">
+                <h4>Auto-detected Tags</h4>
+                <div class="tags-container" id="preview-tags-container"></div>
+              </div>
+
+              <div class="sidebar-block">
+                <h4>Cloud Storage Details</h4>
+                <div class="meta-row">
+                  <span class="meta-label">Storage Key:</span>
+                  <span class="meta-val font-mono" id="preview-storage-key">...</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Privacy:</span>
+                  <span class="meta-val badge-private">Protected (Auth Required)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. CLOUD & AI STATUS / SETUP GUIDE MODAL -->
+    <div id="status-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-header">
+          <div>
+            <h3>100% Free Cloud & AI Setup ($0/Month)</h3>
+            <p class="modal-subtitle" style="color: #34d399; font-weight: 600;">Zero credit card charges • Run completely free forever</p>
+          </div>
+          <button type="button" class="modal-close-btn" id="btn-close-status-modal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="status-cards-grid">
+            <!-- Storage Card -->
+            <div class="service-card" id="card-storage-status">
+              <div class="service-card-header">
+                <span class="service-icon">☁️</span>
+                <div>
+                  <h4>1. Cloud Storage — Cloudflare R2 (10 GB Free)</h4>
+                  <span class="badge" id="diag-storage-badge">Checking...</span>
+                </div>
+              </div>
+              <p class="service-desc" id="diag-storage-msg">...</p>
+              <div class="service-guide">
+                <p><strong>Cost: $0.00 / month</strong></p>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Get 10 GB of free permanent cloud storage with zero download fees at <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Cloudflare R2</a>. Add your bucket keys to <code>.env</code>.</p>
+              </div>
+            </div>
+
+            <!-- Database Card -->
+            <div class="service-card" id="card-db-status">
+              <div class="service-card-header">
+                <span class="service-icon">💾</span>
+                <div>
+                  <h4>2. Database & Search — Built-in SQLite + FTS5</h4>
+                  <span class="badge badge-success">Active ($0.00)</span>
+                </div>
+              </div>
+              <p class="service-desc" id="diag-db-msg">SQLite with FTS5 Full-Text Indexing active and persistent.</p>
+              <div class="service-guide">
+                <p><strong>Cost: $0.00 / month</strong> (Runs locally inside <code>data/vault.sqlite</code> with zero server fees).</p>
+              </div>
+            </div>
+
+            <!-- AI Engine Card -->
+            <div class="service-card" id="card-ai-status">
+              <div class="service-card-header">
+                <span class="service-icon">🧠</span>
+                <div>
+                  <h4>3. AI Search — Google Gemini 1.5 Flash (100% Free)</h4>
+                  <span class="badge" id="diag-ai-badge">Checking...</span>
+                </div>
+              </div>
+              <p class="service-desc" id="diag-ai-msg">...</p>
+              <div class="service-guide">
+                <p><strong>Cost: $0.00 / month</strong></p>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Google provides <strong>1,500 free AI queries per day</strong> with no card required. Get your free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> and set <code>GEMINI_API_KEY</code> in <code>.env</code>.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="phone-access-card">
+            <h4>📱 Free Mobile Access (Phone & Laptop)</h4>
+            <p>1. Connect your phone and laptop to the same Wi-Fi network.</p>
+            <p>2. Open your phone's browser and go to: <code id="phone-access-url">http://&lt;your-laptop-ip&gt;:3000</code></p>
+            <p>3. Tap <em>"Add to Home Screen"</em> on your phone to use your vault like a free personal native app!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
