@@ -9,45 +9,50 @@ const __dirname = path.dirname(__filename);
 // Load .env from project root
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
+function cleanEnv(val, fallback = '') {
+  if (!val) return fallback;
+  return String(val).trim().replace(/^["']|["']$/g, '');
+}
+
 export const config = {
-  port: parseInt(process.env.PORT || '3003', 10),
-  jwtSecret: process.env.JWT_SECRET || 'personal-ai-vault-super-secure-jwt-secret-key-2026',
-  env: process.env.NODE_ENV || 'development',
+  port: parseInt(cleanEnv(process.env.PORT, '3003'), 10),
+  jwtSecret: cleanEnv(process.env.JWT_SECRET, 'personal-ai-vault-super-secure-jwt-secret-key-2026'),
+  env: cleanEnv(process.env.NODE_ENV, 'development'),
   
   // Storage Configuration (S3-compatible: AWS S3, Cloudflare R2, Supabase Storage, or Google Drive)
   storage: {
-    provider: process.env.STORAGE_PROVIDER || 's3', // 's3', 'r2', 'supabase', 'gdrive', 'google-drive', or 'local-staging'
-    bucket: process.env.S3_BUCKET || process.env.STORAGE_BUCKET || '',
-    region: process.env.S3_REGION || process.env.AWS_REGION || 'us-east-1',
-    endpoint: process.env.S3_ENDPOINT || '', // e.g. https://<account_id>.r2.cloudflarestorage.com or https://<project_id>.supabase.co/storage/v1/s3
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '',
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+    provider: cleanEnv(process.env.STORAGE_PROVIDER, 's3'), // 's3', 'r2', 'supabase', 'gdrive', 'google-drive', or 'local-staging'
+    bucket: cleanEnv(process.env.S3_BUCKET || process.env.STORAGE_BUCKET),
+    region: cleanEnv(process.env.S3_REGION || process.env.AWS_REGION, 'us-east-1'),
+    endpoint: cleanEnv(process.env.S3_ENDPOINT), // e.g. https://<account_id>.r2.cloudflarestorage.com or https://<project_id>.supabase.co/storage/v1/s3
+    accessKeyId: cleanEnv(process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID),
+    secretAccessKey: cleanEnv(process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY),
+    forcePathStyle: cleanEnv(process.env.S3_FORCE_PATH_STYLE) === 'true',
     // Google Drive options (15 GB free storage)
-    googleDriveFolderId: (process.env.GDRIVE_FOLDER_ID || '').includes('/folders/')
-      ? (process.env.GDRIVE_FOLDER_ID || '').split('/folders/')[1].split(/[?#]/)[0]
-      : (process.env.GDRIVE_FOLDER_ID || '').trim(),
-    googleClientId: process.env.GDRIVE_CLIENT_ID || '',
-    googleClientSecret: process.env.GDRIVE_CLIENT_SECRET || '',
-    googleRefreshToken: process.env.GDRIVE_REFRESH_TOKEN || '',
-    googleServiceAccountEmail: process.env.GDRIVE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '',
-    googlePrivateKey: (process.env.GDRIVE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    googleKeyFilePath: process.env.GDRIVE_KEY_FILE ? path.resolve(__dirname, '..', process.env.GDRIVE_KEY_FILE) : path.join(__dirname, '..', 'google-service-account.json'),
+    googleDriveFolderId: cleanEnv(process.env.GDRIVE_FOLDER_ID).includes('/folders/')
+      ? cleanEnv(process.env.GDRIVE_FOLDER_ID).split('/folders/')[1].split(/[?#]/)[0]
+      : cleanEnv(process.env.GDRIVE_FOLDER_ID),
+    googleClientId: cleanEnv(process.env.GDRIVE_CLIENT_ID),
+    googleClientSecret: cleanEnv(process.env.GDRIVE_CLIENT_SECRET),
+    googleRefreshToken: cleanEnv(process.env.GDRIVE_REFRESH_TOKEN),
+    googleServiceAccountEmail: cleanEnv(process.env.GDRIVE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL),
+    googlePrivateKey: cleanEnv(process.env.GDRIVE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY).replace(/\\n/g, '\n'),
+    googleKeyFilePath: process.env.GDRIVE_KEY_FILE ? path.resolve(__dirname, '..', cleanEnv(process.env.GDRIVE_KEY_FILE)) : path.join(__dirname, '..', 'google-service-account.json'),
   },
 
   // AI Configuration (Gemini or OpenAI)
   ai: {
-    provider: process.env.AI_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : (process.env.OPENAI_API_KEY ? 'openai' : 'none')),
-    geminiApiKey: process.env.GEMINI_API_KEY || '',
-    geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-    openaiApiKey: process.env.OPENAI_API_KEY || '',
-    openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    provider: cleanEnv(process.env.AI_PROVIDER, cleanEnv(process.env.GEMINI_API_KEY) ? 'gemini' : (cleanEnv(process.env.OPENAI_API_KEY) ? 'openai' : 'none')),
+    geminiApiKey: cleanEnv(process.env.GEMINI_API_KEY),
+    geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-1.5-flash'),
+    openaiApiKey: cleanEnv(process.env.OPENAI_API_KEY),
+    openaiModel: cleanEnv(process.env.OPENAI_MODEL, 'gpt-4o-mini'),
   },
 
   // Database path / connection
   db: {
-    path: process.env.DB_PATH || path.join(__dirname, '..', 'data', 'vault.sqlite'),
-    url: process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED || '',
+    path: cleanEnv(process.env.DB_PATH, path.join(__dirname, '..', 'data', 'vault.sqlite')),
+    url: cleanEnv(process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED),
   }
 };
 
