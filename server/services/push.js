@@ -7,7 +7,12 @@ import { taskModel, pushSubscriptionModel } from '../db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const VAPID_KEY_FILE = path.join(__dirname, '..', '..', 'data', 'vapid_keys.json');
+// Vercel deployments have a read-only application directory. Persistent VAPID
+// keys should be supplied as environment variables there; /tmp only prevents
+// startup failures when local fallback keys are required.
+const VAPID_KEY_FILE = process.env.VERCEL
+  ? path.join('/tmp', 'personal-ai-vault-vapid_keys.json')
+  : path.join(__dirname, '..', '..', 'data', 'vapid_keys.json');
 
 let activeVapidKeys = {
   publicKey: config.vapid.publicKey,

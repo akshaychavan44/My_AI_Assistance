@@ -10,7 +10,12 @@ import { config } from '../config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const stagingDir = path.join(__dirname, '..', '..', 'staging_temp');
+// Vercel makes the deployed bundle read-only. Its only writable filesystem
+// location is /tmp, which is ephemeral and therefore only suitable as a
+// fallback buffer while cloud storage is unavailable.
+const stagingDir = process.env.VERCEL
+  ? path.join('/tmp', 'personal-ai-vault-staging')
+  : path.join(__dirname, '..', '..', 'staging_temp');
 
 // Ensure staging directory exists for temporary upload buffer / staging fallback
 if (!fs.existsSync(stagingDir)) {
