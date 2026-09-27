@@ -11,6 +11,9 @@ import noteRoutes from './routes/notes.js';
 import credentialRoutes from './routes/credentials.js';
 import searchRoutes from './routes/search.js';
 import statusRoutes from './routes/status.js';
+import taskRoutes from './routes/tasks.js';
+import pushRoutes from './routes/push.js';
+import { startReminderScheduler } from './services/scheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +51,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/credentials', credentialRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/status', statusRoutes);
 
@@ -63,7 +68,8 @@ app.get('*', (req, res) => {
 if (process.env.VERCEL !== '1') {
   initDatabase().then(() => {
     dbInitialized = true;
-    app.listen(config.port, '0.0.0.0', () => {
+    startReminderScheduler();
+    const server = app.listen(config.port, '0.0.0.0', () => {
       console.log(`\n======================================================`);
       console.log(`🔒 Personal AI Vault running on http://localhost:${config.port}`);
       console.log(`📱 Access from phone on your local network: http://<your-laptop-ip>:${config.port}`);
@@ -73,8 +79,18 @@ if (process.env.VERCEL !== '1') {
       console.log(`☁️ Cloud Storage: ${status.storage.connected ? '🟢 Connected (' + status.storage.provider + ')' : '🟡 Local Staging Mode (Cloud credentials needed in .env)'}`);
       console.log(`💾 Database: 🟢 Active (${status.database.type})`);
       console.log(`🧠 AI Retrieval: ${status.ai.connected ? '🟢 Connected (' + status.ai.provider + ')' : '🟡 AI Key needed in .env (Add GEMINI_API_KEY for free AI)'}`);
+      console.log(`⏰ Push Reminders: 🟢 Active (Scheduled every 60s)`);
       console.log(`======================================================\n`);
     });
+
+    const shutdown = () => {
+      server.close(() => {
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   }).catch(err => {
     console.error('Failed to start server:', err);
   });

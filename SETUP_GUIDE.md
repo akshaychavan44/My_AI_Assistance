@@ -83,7 +83,28 @@ If you prefer Supabase:
 
 ---
 
-## Step 3: Access from Your Phone for Free
+## Step 3: Web Push Notifications & Reminders Setup (100% Free)
+
+Push notifications use the open W3C Web Push standard with RFC 8292 VAPID encryption. No third-party paid notification service (e.g., Firebase, OneSignal) is required!
+
+1. **Automatic Development Keys**: On first start, the server automatically generates a local VAPID keypair in `data/vapid_keys.json` so notifications work immediately out-of-the-box.
+2. **Production Key Generation (Optional)**:
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   Add the output to your [`.env`](file:///c:/Users/aksha/localstorage/Desktop/MyStorage/.env):
+   ```env
+   VAPID_PUBLIC_KEY=BG...
+   VAPID_PRIVATE_KEY=...
+   VAPID_SUBJECT=mailto:your-email@example.com
+   ```
+3. **Scheduled Reminders**:
+   - The built-in scheduler checks for due reminders every 60 seconds.
+   - For serverless deployments (Vercel, AWS Lambda), set `CRON_SECRET=your-cron-secret` in `.env` and trigger `POST /api/tasks/cron/reminders` with header `Authorization: Bearer your-cron-secret` via Vercel Cron or GitHub Actions.
+
+---
+
+## Step 4: Access from Your Phone for Free
 
 You do not need to pay for any cloud hosting or domain to use the vault from your phone:
 
@@ -97,4 +118,4 @@ You do not need to pay for any cloud hosting or domain to use the vault from you
    ```
    http://192.168.1.45:3000
    ```
-5. Bookmark it or tap **"Add to Home Screen"** on your phone to use it like a native mobile app!
+5. Bookmark it or tap **"Add to Home Screen"** on your phone to install the PWA, enable push notifications, and receive reminder alerts even when the browser is in the background!

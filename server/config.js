@@ -44,16 +44,25 @@ export const config = {
   ai: {
     provider: cleanEnv(process.env.AI_PROVIDER, cleanEnv(process.env.GEMINI_API_KEY) ? 'gemini' : (cleanEnv(process.env.OPENAI_API_KEY) ? 'openai' : 'none')),
     geminiApiKey: cleanEnv(process.env.GEMINI_API_KEY),
-    geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-1.5-flash'),
+    geminiModel: cleanEnv(process.env.GEMINI_MODEL, 'gemini-3.8-flash'),
     openaiApiKey: cleanEnv(process.env.OPENAI_API_KEY),
     openaiModel: cleanEnv(process.env.OPENAI_MODEL, 'gpt-4o-mini'),
   },
 
-  // Database path / connection
+  // Database connection (Neon Serverless PostgreSQL)
   db: {
-    path: cleanEnv(process.env.DB_PATH, path.join(__dirname, '..', 'data', 'vault.sqlite')),
     url: cleanEnv(process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED),
-  }
+  },
+
+  // Web Push VAPID Configuration
+  vapid: {
+    publicKey: cleanEnv(process.env.VAPID_PUBLIC_KEY),
+    privateKey: cleanEnv(process.env.VAPID_PRIVATE_KEY),
+    subject: cleanEnv(process.env.VAPID_SUBJECT || process.env.VAPID_EMAIL, 'mailto:admin@personal-ai-vault.app'),
+  },
+
+  // Background Scheduling & Cron Secret for Serverless / External Triggers
+  cronSecret: cleanEnv(process.env.CRON_SECRET, 'personal-ai-vault-cron-secret-2026')
 };
 
 /**
@@ -95,12 +104,12 @@ export function getServicesStatus() {
       message: storageMessage
     },
     database: {
-      connected: true,
-      type: isNeonConfigured ? 'Neon Serverless PostgreSQL (Cloud Database)' : 'SQLite Database with Full-Text Search',
-      location: isNeonConfigured ? 'Neon Cloud (AWS us-east-2)' : config.db.path,
+      connected: isNeonConfigured,
+      type: 'Neon Serverless PostgreSQL (Cloud Database)',
+      location: isNeonConfigured ? (config.db.url.split('@')[1]?.split('?')[0] || 'Neon Cloud') : 'Not Configured',
       message: isNeonConfigured
-        ? 'Connected to Neon Serverless PostgreSQL with cloud resilience & JSONB indexing'
-        : 'Database operational (User auth, Document indexing, Metadata & Search active)'
+        ? 'Connected to Neon Serverless PostgreSQL with cloud resilience, ACID transactions & JSONB indexing'
+        : 'Please set DATABASE_URL in .env to connect your Neon PostgreSQL database'
     },
     ai: {
       connected: isAiConfigured,
@@ -109,6 +118,14 @@ export function getServicesStatus() {
       message: isAiConfigured
         ? `Connected to ${isGeminiConfigured ? 'Google Gemini' : 'OpenAI'} (${isGeminiConfigured ? config.ai.geminiModel : config.ai.openaiModel})`
         : 'AI service not connected. Add GEMINI_API_KEY (Free tier available) or OPENAI_API_KEY to enable AI Grounded Search'
+    },
+    push: {
+      connected: Boolean(config.vapid.publicKey && config.vapid.privateKey),
+      hasExplicitKeys: Boolean(config.vapid.publicKey && config.vapid.privateKey),
+      subject: config.vapid.subject,
+      message: Boolean(config.vapid.publicKey && config.vapid.privateKey)
+        ? 'VAPID Web Push active with custom keys'
+        : 'Web Push active with auto-generated local VAPID keys'
     }
   };
 }

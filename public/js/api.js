@@ -151,7 +151,7 @@ export const api = {
     }
   },
 
-  // Search & AI RAG
+  // Search & AI RAG & Local Laptop Search
   search: {
     async fullText(query) {
       return await api.request(`/search?q=${encodeURIComponent(query)}`);
@@ -162,6 +162,95 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ question })
       });
+    },
+
+    async searchLaptop(query, type = 'all') {
+      return await api.request(`/search/laptop?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+    },
+
+    async openInExplorer(path) {
+      return await api.request('/search/laptop/open', {
+        method: 'POST',
+        body: JSON.stringify({ path })
+      });
+    }
+  },
+
+  // Tasks & Reminders
+  tasks: {
+    async list({ status = 'all', search = '', limit = 300, offset = 0 } = {}) {
+      const params = new URLSearchParams();
+      if (status && status !== 'all') params.set('status', status);
+      if (search) params.set('q', search);
+      if (limit) params.set('limit', limit);
+      if (offset) params.set('offset', offset);
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      return await api.request(`/tasks${queryString}`);
+    },
+
+    async get(id) {
+      return await api.request(`/tasks/${id}`);
+    },
+
+    async getStats() {
+      return await api.request('/tasks/stats');
+    },
+
+    async create(taskData) {
+      return await api.request('/tasks', {
+        method: 'POST',
+        body: JSON.stringify(taskData)
+      });
+    },
+
+    async update(id, taskData) {
+      return await api.request(`/tasks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(taskData)
+      });
+    },
+
+    async toggle(id) {
+      return await api.request(`/tasks/${id}/toggle`, {
+        method: 'PATCH'
+      });
+    },
+
+    async delete(id) {
+      return await api.request(`/tasks/${id}`, {
+        method: 'DELETE'
+      });
+    }
+  },
+
+  // Web Push Subscriptions
+  push: {
+    async getVapidKey() {
+      return await api.request('/push/vapid-key');
+    },
+
+    async subscribe(subscriptionData) {
+      return await api.request('/push/subscribe', {
+        method: 'POST',
+        body: JSON.stringify(subscriptionData)
+      });
+    },
+
+    async unsubscribe(endpoint) {
+      return await api.request('/push/unsubscribe', {
+        method: 'POST',
+        body: JSON.stringify({ endpoint })
+      });
+    },
+
+    async test() {
+      return await api.request('/push/test', {
+        method: 'POST'
+      });
+    },
+
+    async getDevices() {
+      return await api.request('/push/devices');
     }
   },
 
