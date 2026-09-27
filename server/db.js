@@ -4,101 +4,73 @@ import { config } from './config.js';
 const { Pool } = pg;
 
 let pgPool = null;
+let schemaInitialized = false;
 
 export function getPgPool() {
   if (!pgPool) {
-    if (!config.db.url) {
-      throw new Error('DATABASE_URL is not configured in .env. Please provide your Neon PostgreSQL connection string.');
+    let rawUrl = config.db.url || process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED || '';
+    rawUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
+
+    if (!rawUrl) {
+      throw new Error('DATABASE_URL is not configured in environment variables.');
     }
+
+    // Clean connection string for Node.js pg driver in serverless environments
+    // Strip channel_binding which causes SCRAM failures in Node pg on Linux
+    let cleanUrl = rawUrl
+      .replace(/[?&]channel_binding=[^&]+/g, '')
+      .replace(/[?&]sslmode=[^&]+/g, '');
+
+    if (cleanUrl.includes('?')) {
+      cleanUrl += '&sslmode=require';
+    } else {
+      cleanUrl += '?sslmode=require';
+    }
+
     pgPool = new Pool({
-      connectionString: config.db.url,
+      connectionString: cleanUrl,
       ssl: { rejectUnauthorized: false },
-      max: 10,
+      max: process.env.VERCEL ? 1 : 10,
+      connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
     });
+
     pgPool.on('error', (err) => {
       console.error('Unexpected error on idle Neon PostgreSQL client:', err.message);
+      // In serverless, reset pool on error so subsequent requests can reconnect cleanly
+      pgPool = null;
     });
   }
   return pgPool;
 }
 
 export async function initDatabase() {
+  if (schemaInitialized) return getPgPool();
   const pool = getPgPool();
   try {
     await pool.query('SELECT 1');
-    const host = config.db.url.split('@')[1]?.split('?')[0] || 'Neon Cloud';
+    const host = config.db.url?.split('@')[1]?.split('?')[0] || 'Neon Cloud';
     console.log('✅ Connected to Neon Serverless PostgreSQL Database at:', host);
 
-    // Ensure all tables and indexes exist in Neon
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id BIGSERIAL PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        email TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        voiceprint JSONB DEFAULT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
+    // Run DDL schema check safely once
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id BIGSERIAL PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          email TEXT NOT NULL UNIQUE,
+          password_hash TEXT NOT NULL,
+          voiceprint JSONB DEFAULT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
 
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS voiceprint JSONB DEFAULT NULL;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS voiceprint JSONB DEFAULT NULL;
+      `);
+    } catch (ddlErr) {
+      console.warn('Schema check warning (non-fatal):', ddlErr.message);
+    }
 
-      CREATE TABLE IF NOT EXISTS files (
-        id UUID PRIMARY KEY,
-        user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        original_name TEXT NOT NULL,
-        storage_key TEXT NOT NULL,
-        storage_provider TEXT NOT NULL DEFAULT 's3',
-        mime_type TEXT NOT NULL,
-        size_bytes BIGINT NOT NULL,
-        extracted_text TEXT NOT NULL DEFAULT '',
-        summary TEXT NOT NULL DEFAULT '',
-        tags JSONB NOT NULL DEFAULT '[]'::jsonb,
-        is_note BOOLEAN NOT NULL DEFAULT false,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-
-      CREATE INDEX IF NOT EXISTS files_user_created_idx ON files(user_id, created_at DESC);
-
-      CREATE TABLE IF NOT EXISTS tasks (
-        id UUID PRIMARY KEY,
-        user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        title TEXT NOT NULL,
-        notes TEXT NOT NULL DEFAULT '',
-        due_at TIMESTAMPTZ,
-        timezone TEXT NOT NULL DEFAULT 'UTC',
-        reminder_timing TEXT NOT NULL DEFAULT 'due_time',
-        reminder_offset_minutes INTEGER NOT NULL DEFAULT 0,
-        reminder_at TIMESTAMPTZ,
-        reminder_sent BOOLEAN NOT NULL DEFAULT false,
-        reminder_sent_at TIMESTAMPTZ,
-        is_completed BOOLEAN NOT NULL DEFAULT false,
-        completed_at TIMESTAMPTZ,
-        recurrence_rule TEXT NOT NULL DEFAULT 'none',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-
-      CREATE INDEX IF NOT EXISTS tasks_user_due_idx ON tasks(user_id, due_at ASC);
-      CREATE INDEX IF NOT EXISTS tasks_user_completed_idx ON tasks(user_id, is_completed, due_at ASC);
-      CREATE INDEX IF NOT EXISTS tasks_reminder_pending_idx ON tasks(reminder_sent, reminder_at);
-
-      CREATE TABLE IF NOT EXISTS push_subscriptions (
-        id UUID PRIMARY KEY,
-        user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        endpoint TEXT NOT NULL UNIQUE,
-        p256dh TEXT NOT NULL,
-        auth TEXT NOT NULL,
-        user_agent TEXT NOT NULL DEFAULT '',
-        device_name TEXT NOT NULL DEFAULT '',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-
-      CREATE INDEX IF NOT EXISTS push_subs_user_idx ON push_subscriptions(user_id);
-    `);
-
+    schemaInitialized = true;
     return pool;
   } catch (err) {
     console.error('❌ Failed to initialize Neon PostgreSQL database:', err.message);
