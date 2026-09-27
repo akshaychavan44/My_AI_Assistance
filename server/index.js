@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { config, getServicesStatus } from './config.js';
 import { initDatabase } from './db.js';
@@ -14,6 +15,8 @@ import statusRoutes from './routes/status.js';
 import taskRoutes from './routes/tasks.js';
 import pushRoutes from './routes/push.js';
 import { startReminderScheduler } from './services/scheduler.js';
+
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,33 +49,63 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Serve static frontend UI from public/
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/files', fileRoutes);
-app.use('/api/notes', noteRoutes);
-app.use('/api/credentials', credentialRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/push', pushRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/status', statusRoutes);
+// Mount routes for both /api/path and /path for robust serverless support
+const mountApiRoute = (subPath, routerHandler) => {
+  app.use(`/api${subPath}`, routerHandler);
+  app.use(subPath, routerHandler);
+};
+
+mountApiRoute('/auth', authRoutes);
+mountApiRoute('/files', fileRoutes);
+mountApiRoute('/notes', noteRoutes);
+mountApiRoute('/credentials', credentialRoutes);
+mountApiRoute('/tasks', taskRoutes);
+mountApiRoute('/push', pushRoutes);
+mountApiRoute('/search', searchRoutes);
+mountApiRoute('/status', statusRoutes);
 
 // SPA Fallback for client routes
 app.get('*', (req, res) => {
-  if (req.path.startsWith('/api/')) {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/auth') || req.path.startsWith('/files') || req.path.startsWith('/notes') || req.path.startsWith('/credentials') || req.path.startsWith('/tasks') || req.path.startsWith('/push') || req.path.startsWith('/search') || req.path.startsWith('/status')) {
     return res.status(404).json({ error: 'Endpoint not found' });
   }
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  const indexPath = path.join(__dirname, '..', 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  res.status(200).send('Personal AI Vault');
 });
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal Server Error'
+  });
+});
+
+function getLocalIp() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
 
 // Start local server if not running inside serverless environment
 if (process.env.VERCEL !== '1') {
   initDatabase().then(() => {
     dbInitialized = true;
     startReminderScheduler();
+    const localIp = getLocalIp();
     const server = app.listen(config.port, '0.0.0.0', () => {
       console.log(`\n======================================================`);
       console.log(`🔒 Personal AI Vault running on http://localhost:${config.port}`);
-      console.log(`📱 Access from phone on your local network: http://<your-laptop-ip>:${config.port}`);
+      console.log(`📱 Access from phone on your Wi-Fi: http://${localIp}:${config.port}`);
       console.log(`======================================================`);
       
       const status = getServicesStatus();

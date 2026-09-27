@@ -1,5 +1,5 @@
-const CACHE = 'ai-vault-shell-v5';
-const SHELL = ['/', '/index.html', '/css/style.css', '/js/app.js', '/js/api.js', '/js/voiceprint.js', '/manifest.webmanifest'];
+const CACHE = 'ai-vault-shell-v6';
+const SHELL = ['/', '/index.html', '/css/style.css', '/js/app.js', '/js/api.js', '/js/voiceprint.js', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

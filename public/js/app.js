@@ -45,6 +45,7 @@ const elements = {
   dropdownUserName: document.getElementById('dropdown-user-name'),
   dropdownUserAvatar: document.getElementById('dropdown-user-avatar'),
   dropdownUserEmail: document.getElementById('dropdown-user-email'),
+  btnInstallPwa: document.getElementById('btn-install-pwa'),
   btnLogout: document.getElementById('btn-logout'),
 
   // Sidebar
@@ -409,6 +410,62 @@ function setupEventListeners() {
       state.files = [];
       state.tasks = [];
       showAuthView();
+    });
+  }
+
+  // PWA Install & Mobile Access
+  let deferredInstallPrompt = null;
+  const installModal = document.getElementById('install-modal');
+  const btnCloseInstallModal = document.getElementById('btn-close-install-modal');
+  const btnTriggerPwaInstall = document.getElementById('btn-trigger-pwa-install');
+  const btnCopyMobileUrl = document.getElementById('btn-copy-mobile-url');
+  const mobileInstallUrl = document.getElementById('mobile-install-url');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+  });
+
+  if (elements.btnInstallPwa) {
+    elements.btnInstallPwa.addEventListener('click', () => {
+      if (elements.userDropdownMenu) {
+        elements.userDropdownMenu.style.display = 'none';
+        if (elements.btnUserMenu) {
+          elements.btnUserMenu.classList.remove('active');
+          elements.btnUserMenu.setAttribute('aria-expanded', 'false');
+        }
+      }
+      if (installModal) installModal.style.display = 'flex';
+    });
+  }
+
+  if (btnCloseInstallModal && installModal) {
+    btnCloseInstallModal.addEventListener('click', () => {
+      installModal.style.display = 'none';
+    });
+  }
+
+  if (btnTriggerPwaInstall) {
+    btnTriggerPwaInstall.addEventListener('click', async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const choice = await deferredInstallPrompt.userChoice;
+        if (choice.outcome === 'accepted' && installModal) {
+          installModal.style.display = 'none';
+        }
+        deferredInstallPrompt = null;
+      } else {
+        alert('To install in Google Chrome on your Laptop:\n\n1. Look at the top right of Chrome (next to your profile picture).\n2. Click the 3 dots menu (⋮) ➔ "Save and share" (or "Cast, save and share") ➔ "Install Vault".');
+      }
+    });
+  }
+
+  if (btnCopyMobileUrl && mobileInstallUrl) {
+    btnCopyMobileUrl.addEventListener('click', () => {
+      navigator.clipboard.writeText(mobileInstallUrl.textContent.trim()).then(() => {
+        btnCopyMobileUrl.textContent = '✓ Copied!';
+        setTimeout(() => { btnCopyMobileUrl.textContent = '📋 Copy'; }, 2000);
+      });
     });
   }
 

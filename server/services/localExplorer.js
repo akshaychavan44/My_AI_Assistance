@@ -217,7 +217,8 @@ export const localExplorer = {
       } catch (e) {}
 
       exec(cmd, (err) => {
-        if (err) return reject(err);
+        // Windows explorer.exe exits with code 1 on success when an explorer instance is already running
+        if (err && err.code !== 1) return reject(err);
         resolve(true);
       });
     });
